@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -11,9 +12,13 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    organization: [{ // Add this field to reference the organization
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Organization" // Reference to the Organization model
+    }]
 });
 
-// Hash mật khẩu trước khi lưu user
+// Hash password before saving user
 userSchema.pre("save", async function (next) {
     if (!this.isModified("password")) return next();
     const salt = await bcrypt.genSalt(10);
