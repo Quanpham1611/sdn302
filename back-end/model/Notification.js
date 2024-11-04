@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const notificationSchema = new mongoose.Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User", // Tham chiếu đến model User
+        ref: "User", // Tham chiếu đến model User hello
         required: true,
     },
     organization_id: {
