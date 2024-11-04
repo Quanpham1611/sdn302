@@ -6,28 +6,29 @@ const checkUserOrganization = async (req, res) => {
     const userId = req.params.userId;
 
     try {
-        // Find organizations that include the user
-        const organization = await Organization.findOne({ members: userId }).populate("members");
+        // Tìm người dùng và lấy danh sách tổ chức mà họ tham gia
+        const user = await User.findById(userId).populate("organization");
 
-        if (!organization) {
-            // If no organization found
+        if (!user || user.organization.length === 0) {
+            // Nếu người dùng không tồn tại hoặc không tham gia tổ chức nào
             return res.status(200).json({
                 message: "User is not in any organization",
             });
         }
 
-        // If organization found
+        // Nếu người dùng có tham gia tổ chức
         return res.status(200).json({
-            message: "User is in an organization",
-            organization,
+            message: "User is in one or more organizations",
+            organizations: user.organization,
         });
     } catch (error) {
-        console.error("Error checking organization:", error);
+        console.error("Error checking user's organizations:", error);
         return res.status(500).json({
             message: "Internal Server Error",
         });
     }
 };
+
 
 const createOrganization = async (req, res) => {
     const { name, description, ownerBy } = req.body; // Add ownerBy to destructured variables
@@ -42,6 +43,11 @@ const createOrganization = async (req, res) => {
         });
 
         await newOrganization.save();
+        console.log(userId);
+        
+        await User.findByIdAndUpdate(userId, {
+            $push: { organization: newOrganization._id } // Thêm organization mới vào danh sách organization của user
+        });
         return res.status(201).json({
             message: "Organization created successfully!",
             organization: newOrganization,
@@ -79,8 +85,49 @@ const joinOrganization = async (req, res) => {
     }
 };
 
+const getOrganizationsByUser = async (req, res) => {
+    const userId = req.userId;
+
+    try {
+        // Tìm người dùng và lấy thông tin chi tiết của các tổ chức họ tham gia
+        const user = await User.findById(userId).populate({
+            path: "organization",
+            populate: [
+                { path: "createdBy", select: "username email" },
+                { path: "ownerBy", select: "username email" }
+            ]
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        if (!user.organization || user.organization.length === 0) {
+            return res.status(200).json({
+                message: "User is not in any organization.",
+                organizations: []
+            });
+        }
+
+        // Tạo danh sách tổ chức kèm theo canEdit và canDelete
+        const organizationsWithPermissions = user.organization.map(org => ({
+            ...org.toObject(),
+            canEdit: org.ownerBy._id.toString() === userId,
+            canDelete: org.ownerBy._id.toString() === userId
+        }));
+
+        // Trả về danh sách tổ chức với thông tin quyền
+        return res.status(200).json({
+            message: "User's organizations retrieved successfully.",
+            organizations: organizationsWithPermissions
+        });
+    } catch (error) {
+        console.error("Error fetching organizations for user:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
 
 
 module.exports = {
-    checkUserOrganization, createOrganization, joinOrganization
+    checkUserOrganization, createOrganization, joinOrganization, getOrganizationsByUser
 };
