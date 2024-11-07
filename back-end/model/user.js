@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
     organization: [{ // Add this field to reference the organization
         type: mongoose.Schema.Types.ObjectId,
         ref: "Organization" // Reference to the Organization model
+    }],
+    teams: [{ // Add this field to reference the teams
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Team" // Reference to the Team model
     }]
 });
 

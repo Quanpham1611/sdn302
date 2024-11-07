@@ -1,9 +1,11 @@
-const express = require("express");
-const { verifyToken } = require("../middleware/auth"); // Make sure to import your token verification middleware
+const express = require('express');
 const router = express.Router();
-const {getNotes} = require("../controller/note.controller");
+const noteController = require('../controller/note.controller');
 
-router.get('/individual',verifyToken, getNotes);
+// Create a new note
+router.post('/:teamId/notes', noteController.createNote);
+
+// Get notes for a team
+router.get('/:teamId/notes', noteController.getNotes);
 
 module.exports = router;
-

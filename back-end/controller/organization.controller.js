@@ -314,11 +314,58 @@ const declineInvitation = async (req, res) => {
     }
 };
 
+const removeMember = async (req, res) => {
+    const { organizationId, memberId } = req.body;
+    const userId = req.userId; // Get userId from the request (after authentication)
+
+    try {
+        // Find the organization by ID
+        const organization = await Organization.findById(organizationId);
+
+        if (!organization) {
+            return res.status(404).json({ message: "Organization not found." });
+        }
+
+        // Check if the user is the owner of the organization
+        if (organization.ownerBy.toString() !== userId) {
+            return res.status(403).json({ message: "You do not have permission to remove members from this organization." });
+        }
+
+        // Remove the member from the organization's members list
+        await User.findByIdAndUpdate(memberId, {
+            $pull: { organization: organizationId }
+        });
+
+        return res.status(200).json({ message: "Member removed successfully." });
+    } catch (error) {
+        console.error("Error removing member:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+const getOrganizationMembers = async (req, res) => {
+    const { organizationId } = req.params;
+
+    try {
+        const organization = await Organization.findById(organizationId).populate('members', 'username');
+        if (!organization) {
+            return res.status(404).json({ message: 'Organization not found' });
+        }
+
+        const members = await User.find({ organization: organizationId });
+
+        res.status(200).json({ members });
+    } catch (error) {
+        console.error('Error fetching organization members:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
 
 module.exports = {
     checkUserOrganization, createOrganization, 
     joinOrganization, getOrganizationsByUser, 
     updateOrganization, deleteOrganization,
     getOrganizationById, inviteMember,
-    acceptInvitation, declineInvitation
+    acceptInvitation, declineInvitation,
+    removeMember, getOrganizationMembers
 };
