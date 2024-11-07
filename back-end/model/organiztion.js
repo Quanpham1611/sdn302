@@ -20,6 +20,10 @@ const organizationSchema = new mongoose.Schema({
         ref: "User", // Reference to the user model
         required: true, // Make it required if you want
     },
+    teams: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Team", // Reference to the team model
+    }],
     createdAt: {
         type: Date,
         default: Date.now,

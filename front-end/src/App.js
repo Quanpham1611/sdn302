@@ -7,6 +7,7 @@ import Home from "./components/home";
 import Header from "./components/Header"; // Import the Header component
 import UserInfo from "./components/UserInfo"; // Import User Info component
 import { useNavigate } from "react-router-dom"; 
+import OrganizationDetails from './components/OrganizationDetails';
 
 function App() {
     return (
@@ -36,6 +37,7 @@ function Main() {
                 <Route element={<Layout />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/user-info" element={<UserInfo />} />
+                    <Route path="/organization/:organizationId" element={<OrganizationDetails />} />
                 </Route>
             </Routes>
         </>
