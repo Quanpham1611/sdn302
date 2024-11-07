@@ -1,5 +1,7 @@
 const Organization = require("../model/organiztion");
 const User = require("../model/user");
+const Team = require("../model/team"); // Import the Team model
+const Notification = require("../model/notification"); // Import the Notification model
 
 // Check if user is in any organization
 const checkUserOrganization = async (req, res) => {
@@ -26,6 +28,41 @@ const checkUserOrganization = async (req, res) => {
         return res.status(500).json({
             message: "Internal Server Error",
         });
+    }
+};
+
+// Update organization
+const updateOrganization = async (req, res) => {
+    const organizationId = req.params.organizationId;
+    const { name, description } = req.body;
+    const userId = req.userId; // Get userId from the request (after authentication)
+
+    try {
+        // Find the organization by ID
+        const organization = await Organization.findById(organizationId);
+
+        if (!organization) {
+            return res.status(404).json({ message: "Organization not found." });
+        }
+
+        // Check if the user is the owner of the organization
+        if (organization.ownerBy.toString() !== userId) {
+            return res.status(403).json({ message: "You do not have permission to update this organization." });
+        }
+
+        // Update the organization details
+        organization.name = name;
+        organization.description = description;
+
+        await organization.save();
+
+        return res.status(200).json({
+            message: "Organization updated successfully.",
+            organization,
+        });
+    } catch (error) {
+        console.error("Error updating organization:", error);
+        return res.status(500).json({ message: "Internal server error." });
     }
 };
 
@@ -127,7 +164,161 @@ const getOrganizationsByUser = async (req, res) => {
     }
 };
 
+const deleteOrganization = async (req, res) => {
+    const organizationId = req.params.organizationId;
+    const userId = req.userId; // Get userId from the request (after authentication)
+
+    try {
+        // Find the organization by ID
+        const organization = await Organization.findById(organizationId);
+
+        if (!organization) {
+            return res.status(404).json({ message: "Organization not found." });
+        }
+
+        // Check if the user is the owner of the organization
+        if (organization.ownerBy.toString() !== userId) {
+            return res.status(403).json({ message: "You do not have permission to delete this organization." });
+        }
+
+        // Remove the organization from the user's organization list
+        await User.updateMany(
+            { organization: organizationId },
+            { $pull: { organization: organizationId } }
+        );
+
+        // Delete the organization
+        await organization.remove();
+
+        return res.status(200).json({ message: "Organization deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting organization:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+const getOrganizationById = async (req, res) => {
+    const organizationId = req.params.organizationId;
+
+    try {
+        const organization = await Organization.findById(organizationId)
+            .populate({
+                path: 'teams',
+                populate: {
+                    path: 'members',
+                    select: 'username'
+                }
+            })
+            .populate('ownerBy', 'username'); // Populate ownerBy with username
+
+        if (!organization) {
+            return res.status(404).json({ message: "Organization not found." });
+        }
+
+        // Populate members from User model
+        const members = await User.find({ organization: organizationId }).select('username');
+
+        return res.status(200).json({ organization, members });
+    } catch (error) {
+        console.error("Error fetching organization details:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+const inviteMember = async (req, res) => {
+    const { organizationId, username } = req.body;
+    
+    try {
+        const user = await User.findOne({ username });
+        
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        const organization = await Organization.findById(organizationId);
+
+        if (!organization) {
+            return res.status(404).json({ message: "Organization not found." });
+        }
+
+        // Create a notification for the user
+        const notification = new Notification({
+            user_id: user._id,
+            organization_id: organizationId,
+            message: `Bạn đã được mời vào tổ chức ${organization.name}.`
+        });
+
+        await notification.save();
+
+        return res.status(200).json({ message: "Member invited successfully. Notification sent." });
+    } catch (error) {
+        console.error("Error inviting member:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+const acceptInvitation = async (req, res) => {
+    const { notificationId } = req.params;
+    const userId = req.userId;
+
+    try {
+        const notification = await Notification.findById(notificationId);
+
+        if (!notification) {
+            return res.status(403).json({ message: "Notification not found." });
+        }
+
+        if (notification.user_id.toString() !== userId) {
+            return res.status(403).json({ message: "You do not have permission to accept this invitation." });
+        }
+
+        // Add user to the organization
+        await User.findByIdAndUpdate(userId, {
+            $addToSet: { organization: notification.organization_id }
+        });
+
+        // Update notification status to "read"
+        notification.status = "read";
+        await notification.save();
+
+        return res.status(200).json({ message: "Invitation accepted successfully." });
+    } catch (error) {
+        console.error("Error accepting invitation:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+const declineInvitation = async (req, res) => {
+    const { notificationId } = req.params;
+    const userId = req.userId;
+
+    try {
+        const notification = await Notification.findById(notificationId);
+
+        if (!notification) {
+            return res.status(403).json({ message: "Notification not found." });
+        }
+
+        if (notification.user_id.toString() !== userId) {
+            return res.status(403).json({ message: "You do not have permission to decline this invitation." });
+        }
+
+        // Update notification status to "read"
+        notification.status = "read";
+        await notification.save();
+
+        return res.status(200).json({ message: "Invitation declined successfully." });
+    } catch (error) {
+        console.error("Error declining invitation:", error);
+        return res.status(500).json({ message: "Internal server error." });
+    }
+};
+
 
 module.exports = {
-    checkUserOrganization, createOrganization, joinOrganization, getOrganizationsByUser
+    checkUserOrganization, createOrganization, 
+    joinOrganization, getOrganizationsByUser, 
+    updateOrganization, deleteOrganization,
+    getOrganizationById, inviteMember,
+    acceptInvitation, declineInvitation
 };
