@@ -1,33 +1,56 @@
-// src/controllers/noteController.js
-const Note = require("../model/Note");
+const Note = require('../model/note');
+const Team = require('../model/team');
+const User = require('../model/user');
 
-const getNotes = async (req, res) => {
-    const userId = req.userId; // Lấy userId từ middleware xác thực
+exports.createNote = async (req, res) => {
+    const { teamId } = req.params;
+    const { description, assignedTo, estimatedHours, priority, header, status, reviewer } = req.body;
+    const createdBy = req.body.createdBy || req.userId; // Assuming you have userId in req
+    const createdAt = new Date();
 
     try {
-        // Tìm tất cả các ghi chú được tạo bởi user này
-        const notes = await Note.find({ createdBy: userId }).sort({ createdAt: -1 }); // Sắp xếp theo thứ tự mới nhất
-
-        if (!notes || notes.length === 0) {
-            return res.status(200).json({
-                message: "No notes found for this user.",
-                notes: []
-            });
+        const team = await Team.findById(teamId);
+        if (!team) {
+            return res.status(404).json({ message: 'Team not found' });
         }
 
-        // Trả về danh sách ghi chú
-        return res.status(200).json({
-            message: "Notes retrieved successfully.",
-            notes: notes
+        const noteCount = await Note.countDocuments({ team: teamId });
+        const ticketId = `THP1-${noteCount + 1}`;
+
+        const estimatedCompletionDate = new Date(createdAt.getTime() + estimatedHours * 60 * 60 * 1000);
+
+        const newNote = new Note({
+            ticketId,
+            header,
+            description,
+            createdBy,
+            assignedTo,
+            reviewer: status === 'Review' ? reviewer : null,
+            createdAt,
+            estimatedHours,
+            estimatedCompletionDate,
+            priority,
+            status,
+            team: teamId
         });
+
+        await newNote.save();
+
+        res.status(201).json({ message: 'Note created successfully', note: newNote });
     } catch (error) {
-        console.error("Error retrieving notes:", error);
-        return res.status(500).json({
-            message: "Internal server error."
-        });
+        console.error('Error creating note:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-module.exports = {
-    getNotes,
+exports.getNotes = async (req, res) => {
+    const { teamId } = req.params;
+
+    try {
+        const notes = await Note.find({ team: teamId }).populate('createdBy', 'username').populate('assignedTo', 'username').populate('reviewer', 'username');
+        res.status(200).json({ notes });
+    } catch (error) {
+        console.error('Error fetching notes:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 };

@@ -1,43 +1,61 @@
-// models/Note.js
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const noteSchema = new mongoose.Schema({
+    ticketId: {
+        type: String,
+        required: true,
+        unique: true
+    },
     header: {
         type: String,
-        unique: true,
+        required: true
     },
     description: {
         type: String,
-        required: true,
+        required: true
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User", // Tham chiếu đến người dùng tạo note
-        required: true,
+        ref: 'User',
+        required: true
     },
-    estimateHours: {
+    assignedTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false
+    },
+    reviewer: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    estimatedHours: {
         type: Number,
-        required: true,
+        required: true
     },
-    startDate: {
+    estimatedCompletionDate: {
         type: Date,
-        required: true,
+        required: true
     },
-    dueDate: {
-        type: Date,
-        required: true,
+    priority: {
+        type: String,
+        enum: ['Low', 'Medium', 'High'],
+        required: true
     },
-}, {
-    timestamps: true, // Thêm createdAt và updatedAt tự động
-});
-
-// Middleware để tạo header tự động theo format THP1-id
-noteSchema.pre("save", async function (next) {
-    if (this.isNew) {
-        const count = await mongoose.model("Note").countDocuments() + 1;
-        this.header = `THP1-${count}`;
+    status: {
+        type: String,
+        enum: ['To Do', 'In Progress', 'Review', 'Done', 'Cancel'],
+        default: 'To Do'
+    },
+    team: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Team',
+        required: true
     }
-    next();
 });
 
-module.exports = mongoose.model("Note", noteSchema);
+module.exports = mongoose.model('Note', noteSchema);

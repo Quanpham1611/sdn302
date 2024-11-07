@@ -3,7 +3,8 @@ const { checkUserOrganization, createOrganization,
     joinOrganization, getOrganizationsByUser, 
     updateOrganization, deleteOrganization,
     getOrganizationById, inviteMember,
-    acceptInvitation, declineInvitation} = require("../controller/organization.controller")
+    acceptInvitation, declineInvitation,
+    removeMember, getOrganizationMembers} = require("../controller/organization.controller")
 const { verifyToken } = require("../middleware/auth"); // Make sure to import your token verification middleware
 const router = express.Router();
 
@@ -18,5 +19,7 @@ router.get("/:organizationId", verifyToken, getOrganizationById);
 router.post("/invite", verifyToken, inviteMember); // Ensure this route is defined
 router.post("/accept-invitation/:notificationId", verifyToken, acceptInvitation);
 router.post("/decline-invitation/:notificationId", verifyToken, declineInvitation);
+router.post("/removeMember", verifyToken, removeMember);
+router.get('/:organizationId/members', verifyToken, getOrganizationMembers);
 
 module.exports = router;
