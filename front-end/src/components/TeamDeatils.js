@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Table, Button, Modal, Input, Select } from 'antd';
-
+import { Table, Button, Modal, Input, Select, notification } from 'antd';
 
 const { Option } = Select;
 
@@ -24,6 +23,8 @@ const TeamDetails = () => {
     const [selectedNote, setSelectedNote] = useState(null);
     const [showCreateNotePopup, setShowCreateNotePopup] = useState(false);
     const [showEditNotePopup, setShowEditNotePopup] = useState(false);
+    const [showAddMemberPopup, setShowAddMemberPopup] = useState(false); // Thêm trạng thái cho popup thêm thành viên
+    const [newMemberUsername, setNewMemberUsername] = useState(''); // Thêm trạng thái cho username mới
     const accessToken = localStorage.getItem('token');
     const userId = localStorage.getItem('userId'); // Assuming you store the userId in localStorage
 
@@ -165,10 +166,44 @@ const TeamDetails = () => {
         setShowEditNotePopup(true);
     };
 
+    const handleAddMember = () => {
+        fetch(`http://localhost:5173/api/teams/${teamId}/addMember`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username: newMemberUsername })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    notification.success({
+                        message: 'Thành công',
+                        description: data.message,
+                    });
+                } else {
+                    notification.error({
+                        message: 'Lỗi',
+                        description: data.message,
+                    });
+                }
+                setNewMemberUsername('');
+                setShowAddMemberPopup(false);
+                fetchTeamDetails(); // Refresh the team details
+            })
+            .catch(error => {
+                console.error('Error adding member:', error);
+                notification.error({
+                    message: 'Lỗi',
+                    description: 'Có lỗi xảy ra khi thêm thành viên',
+                });
+            });
+    };
+
     if (isLoading) {
         return <div>Loading...</div>;
     }
-
 
     const isOwner = team.ownerBy._id === userId;
     const isMember = team.members.some(member => member._id === userId);
@@ -270,6 +305,23 @@ const TeamDetails = () => {
                             <li key={member._id}>{member.username}</li>
                         ))}
                     </ul>
+                    {isOwner && (
+                        <Button onClick={() => setShowAddMemberPopup(true)}>Thêm thành viên</Button>
+                    )}
+                    <Modal
+                        title="Thêm thành viên"
+                        visible={showAddMemberPopup}
+                        onCancel={() => setShowAddMemberPopup(false)}
+                        onOk={handleAddMember}
+                    >
+                        <label>Username</label>
+                        <Input
+                            value={newMemberUsername}
+                            onChange={(e) => setNewMemberUsername(e.target.value)}
+                            placeholder="Nhập username"
+                            style={{ marginBottom: '10px' }}
+                        />
+                    </Modal>
                 </div>
             )}
             {activeTab === 'notes' && (
@@ -373,6 +425,13 @@ const TeamDetails = () => {
                     >
                         {selectedNote && (
                             <>
+                                <label>Ticket ID</label>
+                                <Input
+                                    value={selectedNote.ticketId}
+                                    readOnly
+                                    placeholder="Ticket ID"
+                                    style={{ marginBottom: '10px' }}
+                                />
                                 <label>Header</label>
                                 <Input
                                     value={selectedNote.header}
@@ -387,9 +446,16 @@ const TeamDetails = () => {
                                     placeholder="Description"
                                     style={{ marginBottom: '10px' }}
                                 />
+                                <label>Report by</label>
+                                <Input
+                                    value={selectedNote.createdBy.username}
+                                    readOnly
+                                    placeholder="Description"
+                                    style={{ marginBottom: '10px' }}
+                                />
                                 <label>Assign to</label>
                                 <Select
-                                    value={selectedNote.assignedTo}
+                                    value={selectedNote.assignedTo ? selectedNote.assignedTo._id : ''}
                                     onChange={(value) => setSelectedNote({ ...selectedNote, assignedTo: value })}
                                     placeholder="Assign to"
                                     style={{ width: '100%', marginBottom: '10px' }}
@@ -398,12 +464,27 @@ const TeamDetails = () => {
                                         <Option key={member._id} value={member._id}>{member.username}</Option>
                                     ))}
                                 </Select>
+                                <label>Created At</label>
+                                <Input
+                                    value={new Date(selectedNote.createdAt).toLocaleString()}
+                                    readOnly
+                                    placeholder="Created At"
+                                    style={{ marginBottom: '10px' }}
+                                />
                                 <label>Estimated hours</label>
                                 <Input
                                     type="number"
                                     value={selectedNote.estimatedHours}
                                     onChange={(e) => setSelectedNote({ ...selectedNote, estimatedHours: e.target.value })}
                                     placeholder="Estimated hours"
+                                    style={{ marginBottom: '10px' }}
+                                />
+                                <label>Estimated Completion</label>
+                                <Input
+                                    type="datetime-local"
+                                    value={new Date(selectedNote.estimatedCompletionDate).toISOString().slice(0, 16)}
+                                    onChange={(e) => setSelectedNote({ ...selectedNote, estimatedCompletionDate: new Date(e.target.value) })}
+                                    placeholder="Estimated Completion"
                                     style={{ marginBottom: '10px' }}
                                 />
                                 <label>Priority</label>
@@ -434,7 +515,7 @@ const TeamDetails = () => {
                                     <>
                                         <label>Reviewer</label>
                                         <Select
-                                            value={selectedNote.reviewer}
+                                            value={selectedNote.reviewer ? selectedNote.reviewer._id : ''}
                                             onChange={(value) => setSelectedNote({ ...selectedNote, reviewer: value })}
                                             placeholder="Reviewer"
                                             style={{ width: '100%', marginBottom: '10px' }}

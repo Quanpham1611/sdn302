@@ -5,43 +5,62 @@ import { useNavigate } from "react-router-dom";
 const Header = () => {
     const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
 
     const handleUserInfoClick = () => {
         navigate("/user-info");
-    };
-
-    const handleHamburgerClick = () => {
-        setIsMenuOpen(!isMenuOpen); // Toggle menu open/close
     };
 
     const handleLogoClick = () => {
         navigate("/"); // Navigate to the home page
     };
 
+    const handleSearchChange = (e) => {
+        setSearchQuery(e.target.value);
+    };
+
+    const handleSearchKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            fetchSearchResults(searchQuery);
+        }
+    };
+
+    const fetchSearchResults = (query) => {
+        const accessToken = localStorage.getItem('token');
+        fetch(`http://localhost:5173/api/users/search?q=${query}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                setSearchResults(data);
+                navigate('/search-results', { state: { searchResults: data } });
+            })
+            .catch(error => {
+                console.error('Error fetching search results:', error);
+            });
+    };
+
     return (
         <header style={styles.header}>
             <div style={styles.logoContainer}>
-                <div style={styles.hamburgerIcon} onClick={handleHamburgerClick}>
-                    {/* Hamburger Menu Icon */}
-                    <svg 
-                        width="30" 
-                        height="30" 
-                        viewBox="0 0 30 30" 
-                        fill="none" 
-                        xmlns="http://www.w3.org/2000/svg"
-                        style={styles.icon}
-                    >
-                        <rect width="30" height="30" rx="5" fill="#f4f4f4"/>
-                        <path d="M5 7H25M5 15H25M5 23H25" stroke="#333" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                </div>
                 <div style={styles.logo} onClick={handleLogoClick}>
                     NoteFree
                 </div>
             </div>
-            <input type="text" placeholder="Search..." style={styles.searchInput} />
+            <input
+                type="text"
+                placeholder="Search..."
+                style={styles.searchInput}
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onKeyPress={handleSearchKeyPress}
+            />
             <div style={styles.userInfoIcon} onClick={handleUserInfoClick}>
-                {/* User Info Icon */}
                 <svg 
                     width="30" 
                     height="30" 
@@ -55,7 +74,6 @@ const Header = () => {
                 </svg>
             </div>
 
-            {/* Menu - Display to the left of the hamburger icon */}
             {isMenuOpen && (
                 <div style={styles.menu}>
                     <p>Menu Item 1</p>
@@ -75,7 +93,7 @@ const styles = {
         padding: '10px 20px',
         backgroundColor: '#f4f4f4',
         borderBottom: '1px solid #ccc',
-        position: 'relative', // To position the menu absolutely
+        position: 'relative',
     },
     logoContainer: {
         display: 'flex',
@@ -84,14 +102,8 @@ const styles = {
     logo: {
         fontSize: '24px',
         fontWeight: 'bold',
-        marginLeft: '10px', // Spacing between logo and hamburger
-        cursor: 'pointer', // Change cursor to pointer for logo
-    },
-    hamburgerIcon: {
+        marginLeft: '10px',
         cursor: 'pointer',
-    },
-    icon: {
-        transition: '0.3s',
     },
     searchInput: {
         padding: '5px',
@@ -101,16 +113,6 @@ const styles = {
     },
     userInfoIcon: {
         cursor: 'pointer',
-    },
-    menu: {
-        position: 'absolute',
-        top: '60px', // Adjust based on header height
-        left: '20px', // Align the menu to the left of the hamburger icon
-        backgroundColor: 'white',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        padding: '10px',
-        borderRadius: '4px',
-        zIndex: 1000, // Ensure the menu appears above other elements
     },
 };
 

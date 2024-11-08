@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { Table, Button, Modal, Input, Select, notification } from 'antd';
+const { Option } = Select;
 
 const Home = () => {
     const isLoggedIn = localStorage.getItem('token') && localStorage.getItem('userId');
@@ -19,7 +21,148 @@ const Home = () => {
     const [showDeletePopup, setShowDeletePopup] = useState(false);
     const [deleteOrgId, setDeleteOrgId] = useState(null);
     const [notifications, setNotifications] = useState([]); // State to store notifications
+    const [personalNotes, setPersonalNotes] = useState([]);
+    const [showCreateNotePopup, setShowCreateNotePopup] = useState(false);
+    const [showEditNotePopup, setShowEditNotePopup] = useState(false);
+    const [selectedNote, setSelectedNote] = useState(null);
 
+    const [newNote, setNewNote] = useState({
+        header: '',
+        description: '',
+        assignedTo: '',
+        estimatedHours: '',
+        priority: 'Low',
+        status: 'To Do',
+        reviewer: ''
+    });
+    const columns = [
+        {
+            title: 'Ticket ID',
+            dataIndex: 'ticketId',
+            key: 'ticketId',
+            sorter: (a, b) => a.ticketId.localeCompare(b.ticketId)
+        },
+        {
+            title: 'Summary',
+            dataIndex: 'header',
+            key: 'header',
+            sorter: (a, b) => a.header.localeCompare(b.header)
+        },
+        {
+            title: 'Description',
+            dataIndex: 'description',
+            key: 'description',
+        },
+        {
+            title: 'Created By',
+            key: 'createdBy',
+            dataIndex: 'createdBy',
+            render: () => 'Yourself',
+        },
+        {
+            title: 'Assigned To',
+            dataIndex: ['assignedTo'],
+            key: 'assignedTo',
+            render: () => 'Yourself',
+            sorter: (a, b) => (a.assignedTo ? a.assignedTo.username : '').localeCompare(b.assignedTo ? b.assignedTo.username : '')
+        },
+        {
+            title: 'Reviewer',
+            dataIndex: ['reviewer'],
+            key: 'reviewer',
+            render: () => 'Yourself',
+            sorter: (a, b) => (a.reviewer ? a.reviewer.username : '').localeCompare(b.reviewer ? b.reviewer.username : '')
+        },
+        {
+            title: 'Priority',
+            dataIndex: 'priority',
+            key: 'priority',
+            sorter: (a, b) => a.priority.localeCompare(b.priority)
+        },
+        {
+            title: 'Status',
+            dataIndex: 'status',
+            key: 'status',
+            filters: [
+                { text: 'To Do', value: 'To Do' },
+                { text: 'In Progress', value: 'In Progress' },
+                { text: 'Review', value: 'Review' },
+                { text: 'Done', value: 'Done' },
+                { text: 'Cancel', value: 'Cancel' }
+            ],
+            onFilter: (value, record) => record.status === value
+        },
+        {
+            title: 'Estimated Completion',
+            dataIndex: 'estimatedCompletionDate',
+            key: 'estimatedCompletionDate',
+            render: (text) => new Date(text).toLocaleString(),
+            sorter: (a, b) => new Date(a.estimatedCompletionDate) - new Date(b.estimatedCompletionDate)
+        }
+    ];
+    const rowClassName = (record) => {
+        switch (record.status) {
+            case 'To Do':
+                return 'todo-row';
+            case 'Done':
+                return 'done-row';
+            case 'Cancel':
+                return 'cancel-row';
+            default:
+                return '';
+        }
+    };
+    const fetchPersonalNotes = () => {
+        fetch(`http://localhost:5173/api/notes/personal`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                setPersonalNotes(data.notes);
+                console.log(data.notes);
+                
+            })
+            .catch(error => {
+                console.error('Error fetching personal notes:', error);
+            });
+    };
+    const handleCreatePersonalNote = () => {
+        const noteData = {
+            ...newNote,
+            createdBy: userId,
+            isPersonal: true // Set isPersonal to true for personal notes
+        };
+
+        fetch(`http://localhost:5173/api/notes/personal`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(noteData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                setNewNote({
+                    header: '',
+                    description: '',
+                    assignedTo: '',
+                    estimatedHours: '',
+                    priority: 'Low',
+                    status: 'To Do',
+                    reviewer: ''
+                });
+                setShowCreateNotePopup(false);
+                fetchPersonalNotes(); // Refresh the personal notes list
+            })
+            .catch(error => {
+                console.error('Error creating personal note:', error);
+            });
+    };
     // Fetch user's organization status
     useEffect(() => {
         if (activeTab === 'to-chuc') {
@@ -45,8 +188,36 @@ const Home = () => {
                     setLoading(false);
                     console.error('Error fetching organization status:', error);
                 });
+        } else if (activeTab === 'ca-nhan') {
+            fetchPersonalNotes();
         }
     }, [activeTab, accessToken]);
+
+        const handleEditNote = () => {
+        const noteData = {
+            ...selectedNote,
+            assignedTo: userId, // Assign to the creator
+            reviewer: selectedNote.status === 'Review' ? userId : null
+        };
+    
+        fetch(`http://localhost:5173/api/notes/personal/${selectedNote._id}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(noteData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                setSelectedNote(null);
+                setShowEditNotePopup(false);
+                fetchPersonalNotes(); // Refresh the notes list
+            })
+            .catch(error => {
+                console.error('Error editing note:', error);
+            });
+    };
 
     const handleAcceptInvitation = (notificationId, organizationId) => {
         fetch(`http://localhost:5173/api/organization/accept-invitation/${notificationId}`, {
@@ -205,6 +376,11 @@ const Home = () => {
             });
     };
 
+    const handleRowClick = (record) => {
+        setSelectedNote(record);
+        setShowEditNotePopup(true);
+    };
+
     const renderContent = () => {
         if (activeTab === 'ca-nhan') {
             return (
@@ -212,15 +388,87 @@ const Home = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                         <h2>Thông tin Cá nhân</h2>
                         <button
-                            onClick={() => alert('Create new note feature not implemented yet')}
+                            onClick={() => setShowCreateNotePopup(true)}
                             style={{ cursor: 'pointer', padding: '10px 20px' }}
                         >
                             + Tạo mới note
                         </button>
                     </div>
     
-                    <p>Đây là nội dung cho Cá nhân.</p>
-                </div>
+                    <Table
+                        columns={columns}
+                        dataSource={personalNotes}
+                        rowKey="_id"
+                        pagination={{ pageSize: 10 }}
+                        rowClassName={rowClassName}
+                        onRow={(record) => ({
+                            onClick: () => handleRowClick(record)
+                        })}
+                    />
+                    <Modal
+                        title="Create Personal Note"
+                        visible={showCreateNotePopup}
+                        onCancel={() => setShowCreateNotePopup(false)}
+                        onOk={handleCreatePersonalNote}
+                    >
+                        <label>Header</label>
+                        <Input
+                            value={newNote.header}
+                            onChange={(e) => setNewNote({ ...newNote, header: e.target.value })}
+                            placeholder="Header"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Description</label>
+                        <Input
+                            value={newNote.description}
+                            onChange={(e) => setNewNote({ ...newNote, description: e.target.value })}
+                            placeholder="Description"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Assign to</label>
+                        <Select
+                            value={newNote.assignedTo}
+                            onChange={(value) => setNewNote({ ...newNote, assignedTo: value })}
+                            placeholder="Assign to"
+                            style={{ width: '100%', marginBottom: '10px' }}
+                        >
+                            <Option value={userId}>Yourself</Option>
+                        </Select>
+                        <label>Estimated hours</label>
+                        <Input
+                            type="number"
+                            value={newNote.estimatedHours}
+                            onChange={(e) => setNewNote({ ...newNote, estimatedHours: e.target.value })}
+                            placeholder="Estimated hours"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Priority</label>
+                        <Select
+                            value={newNote.priority}
+                            onChange={(value) => setNewNote({ ...newNote, priority: value })}
+                            placeholder="Priority"
+                            style={{ width: '100%', marginBottom: '10px' }}
+                        >
+                            <Option value="Low">Low</Option>
+                            <Option value="Medium">Medium</Option>
+                            <Option value="High">High</Option>
+                        </Select>
+                        <label>Status</label>
+                        <Select
+                            value={newNote.status}
+                            onChange={(value) => setNewNote({ ...newNote, status: value })}
+                            placeholder="Status"
+                            style={{ width: '100%', marginBottom: '10px' }}
+                        >
+                            <Option value="To Do">To Do</Option>
+                            <Option value="In Progress">In Progress</Option>
+                            <Option value="Review">Review</Option>
+                            <Option value="Done">Done</Option>
+                            <Option value="Cancel">Cancel</Option>
+                        </Select>
+                    
+                    </Modal>
+                </div>                
             );
         }
         if (activeTab === 'to-chuc') {
@@ -386,6 +634,22 @@ const Home = () => {
         }
     };
 
+    if (!isLoggedIn) {
+        return (
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100vh',
+                textAlign: 'center'
+            }}>
+                <h2>Bạn cần đăng nhập để xem thông tin người dùng</h2>
+                <Link to="/login">Đăng nhập</Link>
+            </div>
+        );
+    }
+
     return (
         <div style={{ display: 'flex', height: '100vh' }}>
             {/* Sidebar */}
@@ -493,6 +757,85 @@ const Home = () => {
                     <button onClick={() => setShowDeletePopup(false)}>Không</button>
                 </div>
             )}
+            <Modal
+                title="Edit Note"
+                visible={showEditNotePopup}
+                onCancel={() => setShowEditNotePopup(false)}
+                onOk={handleEditNote}
+            >
+                {selectedNote && (
+                    <>
+                        <label>Ticket ID</label>
+                        <Input
+                            value={selectedNote.ticketId}
+                            readOnly
+                            placeholder="Ticket ID"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Header</label>
+                        <Input
+                            value={selectedNote.header}
+                            onChange={(e) => setSelectedNote({ ...selectedNote, header: e.target.value })}
+                            placeholder="Header"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Description</label>
+                        <Input
+                            value={selectedNote.description}
+                            onChange={(e) => setSelectedNote({ ...selectedNote, description: e.target.value })}
+                            placeholder="Description"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Created At</label>
+                        <Input
+                            value={new Date(selectedNote.createdAt).toLocaleString()}
+                            readOnly
+                            placeholder="Created At"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Estimated hours</label>
+                        <Input
+                            type="number"
+                            value={selectedNote.estimatedHours}
+                            onChange={(e) => setSelectedNote({ ...selectedNote, estimatedHours: e.target.value })}
+                            placeholder="Estimated hours"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Estimated Completion</label>
+                        <Input
+                            type="datetime-local"
+                            value={new Date(selectedNote.estimatedCompletionDate).toISOString().slice(0, 16)}
+                            onChange={(e) => setSelectedNote({ ...selectedNote, estimatedCompletionDate: new Date(e.target.value) })}
+                            placeholder="Estimated Completion"
+                            style={{ marginBottom: '10px' }}
+                        />
+                        <label>Priority</label>
+                        <Select
+                            value={selectedNote.priority}
+                            onChange={(value) => setSelectedNote({ ...selectedNote, priority: value })}
+                            placeholder="Priority"
+                            style={{ width: '100%', marginBottom: '10px' }}
+                        >
+                            <Option value="Low">Low</Option>
+                            <Option value="Medium">Medium</Option>
+                            <Option value="High">High</Option>
+                        </Select>
+                        <label>Status</label>
+                        <Select
+                            value={selectedNote.status}
+                            onChange={(value) => setSelectedNote({ ...selectedNote, status: value })}
+                            placeholder="Status"
+                            style={{ width: '100%', marginBottom: '10px' }}
+                        >
+                            <Option value="To Do">To Do</Option>
+                            <Option value="In Progress">In Progress</Option>
+                            <Option value="Review">Review</Option>
+                            <Option value="Done">Done</Option>
+                            <Option value="Cancel">Cancel</Option>
+                        </Select>
+                    </>
+                )}
+            </Modal>
         </div>
     );
 };
