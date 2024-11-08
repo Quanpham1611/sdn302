@@ -9,7 +9,7 @@ import UserInfo from "./components/UserInfo"; // Import User Info component
 import { useNavigate } from "react-router-dom"; 
 import OrganizationDetails from './components/OrganizationDetails';
 import TeamDetails from "./components/TeamDeatils";
-
+import SearchResults from "./components/SearchResults";
 function App() {
     return (
         <Router>
@@ -40,6 +40,7 @@ function Main() {
                     <Route path="/user-info" element={<UserInfo />} />
                     <Route path="/organization/:organizationId" element={<OrganizationDetails />} />
                     <Route path="/team/:teamId" element={<TeamDetails />} />
+                    <Route path="/search-results" element={<SearchResults />} />
                 </Route>
             </Routes>
         </>

@@ -16,7 +16,8 @@ exports.createTeam = async (req, res) => {
             name,
             organization: organizationId,
             ownerBy,
-            createdBy
+            createdBy,
+            members: [createdBy] // Thêm người tạo vào danh sách thành viên
         });
 
         await newTeam.save();
@@ -29,6 +30,11 @@ exports.createTeam = async (req, res) => {
         const owner = await User.findById(ownerBy);
         owner.teams.push(newTeam._id);
         await owner.save();
+
+        // Add the new team to the creator's teams array
+        const creator = await User.findById(createdBy);
+        creator.teams.push(newTeam._id);
+        await creator.save();
 
         res.status(201).json({ message: 'Team created successfully', team: newTeam });
     } catch (error) {
@@ -108,14 +114,24 @@ exports.addMember = async (req, res) => {
     const { username } = req.body;
 
     try {
-        const team = await Team.findById(teamId);
+        const team = await Team.findById(teamId).populate('organization');
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ username }).populate('organization');
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Check if the user is in the same organization
+        if (!user.organization.some(org => org.equals(team.organization._id))) {
+            return res.status(400).json({ message: 'User is not in the same organization' });
+        }
+
+        // Check if the user is already a member of the team
+        if (team.members.some(member => member.equals(user._id))) {
+            return res.status(400).json({ message: 'User is already a member of the team' });
         }
 
         // Add the user to the team's members array
