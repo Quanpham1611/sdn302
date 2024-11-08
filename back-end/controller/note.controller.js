@@ -14,7 +14,7 @@ exports.createNote = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        const noteCount = await Note.countDocuments({ team: teamId });
+        const noteCount = await Note.countDocuments();
         const ticketId = `THP1-${noteCount + 1}`;
 
         const estimatedCompletionDate = new Date(createdAt.getTime() + estimatedHours * 60 * 60 * 1000);
